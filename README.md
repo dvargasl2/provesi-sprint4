@@ -1,4 +1,4 @@
-1. Prerrequisitos
+# 1. Prerrequisitos
 
 - Python 3.9+
 - `pip`
@@ -7,11 +7,10 @@
 
 bash
 python -m venv venv
-# Windows (PowerShell)
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-2. Levantar microservicios
+# 2. Levantar microservicios
    
 En una primera terminal:
 
@@ -31,7 +30,7 @@ http://localhost:8001/trace?order_id=1
 
 http://localhost:8001/inventory?order_id=1
 
-2.1. Levantar ms-order-detail (puerto 8080)
+# 2.1. Levantar ms-order-detail (puerto 8080)
 
 En una segunda terminal:
 
@@ -50,7 +49,7 @@ http://localhost:8080/orders/1/full
 
 Debe devolver un JSON con tres secciones: order, trace e inventory.
 
-3. Correr las pruebas de carga con Locust
+# 3. Correr las pruebas de carga con Locust
 
 En una tercera terminal:
 
