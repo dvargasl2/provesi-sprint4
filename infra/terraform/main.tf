@@ -11,17 +11,14 @@ provider "aws" {
   region = "us-east-1"
 }
 
-variable "key_name" {
-  description = "Nombre del keypair de AWS para SSH"
-  type        = string
-}
-
 locals {
   project       = "provesi-asr"
-  instance_type = "t2.micro" # puedes subir a t3.small/t3.medium si se queda corto
-  repo_url      = "https://github.com/dvargasl2/provesi-sprint4.git" # <-- AJUSTADO A TU REPO
+  instance_type = "t2.micro" # súbelo a t3.small/t3.medium si se queda corto
+  repo_url      = "https://github.com/dvargasl2/provesi-sprint4.git" # TU REPO
   branch        = "main"
 }
+
+# ================= VPC / SUBNET / AMI =================
 
 data "aws_vpc" "default" {
   default = true
@@ -44,13 +41,14 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# ---------- Security Group ----------
+# ================= SECURITY GROUP =================
+
 resource "aws_security_group" "sg" {
   name        = "provesi-sg"
   description = "Puertos para microservicios, DBs, Kong y SSH"
   vpc_id      = data.aws_vpc.default.id
 
-  # SSH
+  # SSH (solo lab)
   ingress {
     from_port   = 22
     to_port     = 22
@@ -66,7 +64,7 @@ resource "aws_security_group" "sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Kong admin / ms-orders (depende cómo lo uses)
+  # Kong admin / ms-orders
   ingress {
     from_port   = 8001
     to_port     = 8001
@@ -122,7 +120,7 @@ resource "aws_security_group" "sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # DBs (solo laboratorio, en serio no hagas esto en prod)
+  # DBs (solo para lab)
   ingress {
     from_port   = 5432
     to_port     = 5436
@@ -144,7 +142,8 @@ resource "aws_security_group" "sg" {
   }
 }
 
-# ---------- Bases de datos PostgreSQL ----------
+# ================= BASES DE DATOS (Postgres) =================
+
 resource "aws_instance" "orders_db" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -249,7 +248,8 @@ resource "aws_instance" "order_detail_db" {
   }
 }
 
-# ---------- Microservicios Django/Python ----------
+# ================= MICROSERVICIOS DJANGO/PYTHON =================
+
 resource "aws_instance" "orders" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -374,7 +374,8 @@ resource "aws_instance" "order_detail" {
   }
 }
 
-# ---------- Guardia (Spring Boot) ----------
+# ================= GUARDIA (SPRING BOOT) =================
+
 resource "aws_instance" "guard" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -402,7 +403,8 @@ resource "aws_instance" "guard" {
   }
 }
 
-# ---------- Kong (API Gateway) ----------
+# ================= KONG (API GATEWAY) =================
+
 resource "aws_instance" "kong" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -419,7 +421,7 @@ resource "aws_instance" "kong" {
     systemctl start docker
     usermod -aG docker ubuntu
     mkdir -p /home/ubuntu/kong
-    cat <<'EOK' > /home/ubuntu/kong/kong.yml
+    cat <<EOK > /home/ubuntu/kong/kong.yml
 _format_version: "3.0"
 services:
 - name: security-guard
@@ -431,7 +433,7 @@ services:
       - "~^/orders/\\d+/full$"
     strip_path: false
 EOK
-    docker run --rm --name kong --network host \
+    docker run --name kong --network host \
       -e KONG_DATABASE=off \
       -e KONG_DECLARATIVE_CONFIG=/usr/local/kong/declarative/kong.yml \
       -e KONG_PROXY_LISTEN=0.0.0.0:8000 \
@@ -448,7 +450,8 @@ EOK
   }
 }
 
-# ---------- Locust ----------
+# ================= LOCUST =================
+
 resource "aws_instance" "locust" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
