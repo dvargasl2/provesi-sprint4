@@ -62,3 +62,23 @@ locust -f .\locustfile.py --host http://localhost:8080
 Luego abre en el navegador:
 
 http://localhost:8089
+
+# 3.2. Levantar ms-security-guard (Spring Boot, puerto 8090)
+
+En una terminal con Java 17 y Maven:
+
+```
+cd ms-security-guard
+mvn spring-boot:run
+```
+
+Variables de entorno clave:
+
+- `ORDERS_BASE_URL` (default `http://localhost:8001`)
+- `ORDER_DETAIL_BASE_URL` (default `http://localhost:8080`)
+- `AUTH0_ISSUER`, `AUTH0_AUDIENCE`, `AUTH0_JWKS_URI` para validar JWT
+- `VENDOR_ID_CLAIM` para extraer el vendor del token (default `vendorId`)
+
+Punto de entrada protegido: `GET http://localhost:8090/orders/{id}/full`
+
+Solo si el JWT pertenece al dueño del pedido (según `ms-orders`) el guard reenvía la petición al agregador y devuelve su respuesta; de lo contrario responde 403.

@@ -1,0 +1,33 @@
+server:
+  port: 8090
+
+guard:
+  services:
+    orders-base-url: ${ORDERS_BASE_URL:http://localhost:8001}
+    order-detail-base-url: ${ORDER_DETAIL_BASE_URL:http://localhost:8080}
+  http:
+    connect-timeout: ${HTTP_CONNECT_TIMEOUT:2s}
+    read-timeout: ${HTTP_READ_TIMEOUT:2s}
+  vendor-claim: ${VENDOR_ID_CLAIM:vendorId}
+
+auth0:
+  issuer: ${AUTH0_ISSUER:https://example.auth0.com/}
+  audience: ${AUTH0_AUDIENCE:orders-api}
+  jwk-set-uri: ${AUTH0_JWKS_URI:${auth0.issuer}.well-known/jwks.json}
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${auth0.issuer}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

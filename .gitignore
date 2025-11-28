@@ -4,3 +4,8 @@ __pycache__/
 db.sqlite3
 *.sqlite3
 .env
+target/
+**/target/
+.mvn/
+mvnw
+mvnw.cmd

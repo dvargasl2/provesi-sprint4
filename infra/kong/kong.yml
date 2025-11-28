@@ -1,0 +1,11 @@
+_format_version: "3.0"
+
+services:
+  - name: security-guard
+    url: http://localhost:%%GUARD_PORT%%
+    routes:
+      - name: guard-orders-full
+        methods: [ "GET" ]
+        paths:
+          - "~^/orders/\\d+/full$"
+        strip_path: false
