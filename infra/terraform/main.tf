@@ -37,8 +37,14 @@ data "aws_subnets" "default" {
 
 data "aws_ami" "amazon_linux" {
   most_recent = true
-  filter { name = "name"; values = ["al2023-ami-*-kernel-6.1-*"] }
-  filter { name = "architecture"; values = ["x86_64"] }
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-kernel-6.1-*"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
   owners = ["137112412989"]
 }
 
@@ -161,7 +167,3 @@ EOKONG
     Project = locals.project
   }
 }
-
-output "instance_public_ip" { value = aws_instance.guard_host.public_ip }
-output "public_dns"         { value = aws_instance.guard_host.public_dns }
-output "ssh_command"        { value = "ssh ec2-user@${aws_instance.guard_host.public_dns}" }
