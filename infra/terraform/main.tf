@@ -148,7 +148,6 @@ resource "aws_security_group" "sg" {
 resource "aws_instance" "orders_db" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -175,7 +174,6 @@ resource "aws_instance" "orders_db" {
 resource "aws_instance" "trace_db" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -202,7 +200,6 @@ resource "aws_instance" "trace_db" {
 resource "aws_instance" "inventory_db" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -229,7 +226,6 @@ resource "aws_instance" "inventory_db" {
 resource "aws_instance" "order_detail_db" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -257,7 +253,6 @@ resource "aws_instance" "order_detail_db" {
 resource "aws_instance" "orders" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -289,7 +284,6 @@ resource "aws_instance" "orders" {
 resource "aws_instance" "trace" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -321,7 +315,6 @@ resource "aws_instance" "trace" {
 resource "aws_instance" "inventory" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -353,7 +346,6 @@ resource "aws_instance" "inventory" {
 resource "aws_instance" "order_detail" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -386,7 +378,6 @@ resource "aws_instance" "order_detail" {
 resource "aws_instance" "guard" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -415,7 +406,6 @@ resource "aws_instance" "guard" {
 resource "aws_instance" "kong" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -462,7 +452,6 @@ EOK
 resource "aws_instance" "locust" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
