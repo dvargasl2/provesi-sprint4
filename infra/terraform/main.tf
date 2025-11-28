@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 6.0"
+      version = "~> 5.0"
     }
   }
 }
@@ -18,8 +18,8 @@ variable "key_name" {
 
 locals {
   project       = "provesi-asr"
-  instance_type = "t2.micro" # cambia a t3.small/t3.medium si necesitas más RAM
-  repo_url      = "https://github.com/tu-org/provesi-sprint4.git" # ajusta a tu repo real
+  instance_type = "t2.micro" # puedes subir a t3.small/t3.medium si se queda corto
+  repo_url      = "https://github.com/dvargasl2/provesi-sprint4.git" # <-- AJUSTADO A TU REPO
   branch        = "main"
 }
 
@@ -44,10 +44,13 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+# ---------- Security Group ----------
 resource "aws_security_group" "sg" {
   name        = "provesi-sg"
   description = "Puertos para microservicios, DBs, Kong y SSH"
+  vpc_id      = data.aws_vpc.default.id
 
+  # SSH
   ingress {
     from_port   = 22
     to_port     = 22
@@ -55,15 +58,77 @@ resource "aws_security_group" "sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress { from_port = 8000 to_port = 8000 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # Kong proxy
-  ingress { from_port = 8001 to_port = 8001 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # ms-orders / Kong admin
-  ingress { from_port = 8002 to_port = 8002 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # ms-trace
-  ingress { from_port = 8003 to_port = 8003 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # ms-inventory
-  ingress { from_port = 8080 to_port = 8080 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # ms-order-detail
-  ingress { from_port = 8089 to_port = 8089 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # locust
-  ingress { from_port = 8090 to_port = 8090 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # ms-security-guard
-  ingress { from_port = 8443 to_port = 8443 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # Kong SSL
-  ingress { from_port = 5432 to_port = 5436 protocol = "tcp" cidr_blocks = ["0.0.0.0/0"] } # DBs (solo lab)
+  # Kong proxy
+  ingress {
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Kong admin / ms-orders (depende cómo lo uses)
+  ingress {
+    from_port   = 8001
+    to_port     = 8001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # ms-trace
+  ingress {
+    from_port   = 8002
+    to_port     = 8002
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # ms-inventory
+  ingress {
+    from_port   = 8003
+    to_port     = 8003
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # ms-order-detail
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # locust
+  ingress {
+    from_port   = 8089
+    to_port     = 8089
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # ms-security-guard (Spring Boot)
+  ingress {
+    from_port   = 8090
+    to_port     = 8090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Kong SSL
+  ingress {
+    from_port   = 8443
+    to_port     = 8443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # DBs (solo laboratorio, en serio no hagas esto en prod)
+  ingress {
+    from_port   = 5432
+    to_port     = 5436
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   egress {
     from_port   = 0
@@ -330,10 +395,7 @@ resource "aws_instance" "guard" {
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y git docker.io maven openjdk-17-jdk
-    systemctl enable docker
-    systemctl start docker
-    usermod -aG docker ubuntu
+    apt-get install -y git maven openjdk-17-jdk
     mkdir -p /labs
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
@@ -396,7 +458,7 @@ EOK
   }
 }
 
-# ---------- Locust (opcional) ----------
+# ---------- Locust ----------
 resource "aws_instance" "locust" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -425,28 +487,3 @@ resource "aws_instance" "locust" {
     Role    = "locust"
   }
 }
-
-# ---------- Outputs ----------
-output "orders_public_ip"          { value = aws_instance.orders.public_ip }
-output "trace_public_ip"           { value = aws_instance.trace.public_ip }
-output "inventory_public_ip"       { value = aws_instance.inventory.public_ip }
-output "order_detail_public_ip"    { value = aws_instance.order_detail.public_ip }
-output "guard_public_ip"           { value = aws_instance.guard.public_ip }
-output "kong_public_ip"            { value = aws_instance.kong.public_ip }
-output "locust_public_ip"          { value = aws_instance.locust.public_ip }
-output "orders_db_public_ip"       { value = aws_instance.orders_db.public_ip }
-output "trace_db_public_ip"        { value = aws_instance.trace_db.public_ip }
-output "inventory_db_public_ip"    { value = aws_instance.inventory_db.public_ip }
-output "order_detail_db_public_ip" { value = aws_instance.order_detail_db.public_ip }
-
-output "ssh_orders"        { value = "ssh -i <key.pem> ubuntu@${aws_instance.orders.public_dns}" }
-output "ssh_trace"         { value = "ssh -i <key.pem> ubuntu@${aws_instance.trace.public_dns}" }
-output "ssh_inventory"     { value = "ssh -i <key.pem> ubuntu@${aws_instance.inventory.public_dns}" }
-output "ssh_order_detail"  { value = "ssh -i <key.pem> ubuntu@${aws_instance.order_detail.public_dns}" }
-output "ssh_guard"         { value = "ssh -i <key.pem> ubuntu@${aws_instance.guard.public_dns}" }
-output "ssh_kong"          { value = "ssh -i <key.pem> ubuntu@${aws_instance.kong.public_dns}" }
-output "ssh_locust"        { value = "ssh -i <key.pem> ubuntu@${aws_instance.locust.public_dns}" }
-output "ssh_orders_db"     { value = "ssh -i <key.pem> ubuntu@${aws_instance.orders_db.public_dns}" }
-output "ssh_trace_db"      { value = "ssh -i <key.pem> ubuntu@${aws_instance.trace_db.public_dns}" }
-output "ssh_inventory_db"  { value = "ssh -i <key.pem> ubuntu@${aws_instance.inventory_db.public_dns}" }
-output "ssh_order_detail_db" { value = "ssh -i <key.pem> ubuntu@${aws_instance.order_detail_db.public_dns}" }
