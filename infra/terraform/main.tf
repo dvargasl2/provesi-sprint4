@@ -436,7 +436,7 @@ resource "aws_instance" "kong" {
     systemctl start docker
     usermod -aG docker ubuntu
 
-    AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+    AWS_DEFAULT_REGION=$${AWS_DEFAULT_REGION:-us-east-1}
     GUARD_IP=$(aws ec2 describe-instances \
       --filters "Name=tag:Name,Values=provesi-ms-guard" "Name=instance-state-name,Values=running" \
       --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
