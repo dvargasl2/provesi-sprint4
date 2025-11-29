@@ -11,11 +11,10 @@ provider "aws" {
   region = "us-east-1"
 }
 
-
 locals {
   project       = "provesi-asr"
   instance_type = "t2.micro" # sube a t3.medium si necesitas más RAM
-  repo_url      = "https://github.com/dvargasl2/provesi-sprint4.git" # ajusta a tu repo real
+  repo_url      = "https://github.com/dvargasl2/provesi-sprint4.git"
   branch        = "main"
   zone_name     = "provesi.local"
 }
@@ -41,12 +40,13 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-
-# Security group común
+# ================= Security Group =================
 resource "aws_security_group" "sg" {
   name        = "provesi-sg"
   description = "Puertos para microservicios, DB, Kong y SSH"
+  vpc_id      = data.aws_vpc.default.id
 
+  # SSH
   ingress {
     from_port   = 22
     to_port     = 22
@@ -54,54 +54,71 @@ resource "aws_security_group" "sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Kong HTTP
   ingress {
     from_port   = 8000
     to_port     = 8000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # ms-orders
   ingress {
     from_port   = 8001
     to_port     = 8001
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # ms-trace
   ingress {
     from_port   = 8002
     to_port     = 8002
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # ms-inventory
   ingress {
     from_port   = 8003
     to_port     = 8003
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # ms-order-detail
   ingress {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # Locust UI
   ingress {
     from_port   = 8089
     to_port     = 8089
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # Guard
   ingress {
     from_port   = 8090
     to_port     = 8090
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # Kong HTTPS
   ingress {
     from_port   = 8443
     to_port     = 8443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # Postgres (DB compartida)
   ingress {
     from_port   = 5432
     to_port     = 5432
@@ -122,7 +139,6 @@ resource "aws_security_group" "sg" {
     ManagedBy = "Terraform"
   }
 }
-
 
 # ================= DB compartida =================
 resource "aws_instance" "shared_db" {
@@ -153,8 +169,7 @@ resource "aws_instance" "shared_db" {
   }
 }
 
-# ================= Servicios Django =================
-
+# ================= ms-orders =================
 resource "aws_instance" "orders" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -175,6 +190,7 @@ resource "aws_instance" "orders" {
     source venv/bin/activate
     pip install --upgrade pip
     pip install -r requirements.txt
+    sed -i "s/ALLOWED_HOSTS = .*/ALLOWED_HOSTS = ['*']/" orders_service/settings.py || true    
     nohup python manage.py migrate >/tmp/ms-orders-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8001 >/tmp/ms-orders.log 2>&1 &
   EOF
@@ -188,6 +204,7 @@ resource "aws_instance" "orders" {
   }
 }
 
+# ================= ms-trace =================
 resource "aws_instance" "trace" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -208,6 +225,7 @@ resource "aws_instance" "trace" {
     source venv/bin/activate
     pip install --upgrade pip
     pip install -r requirements.txt
+    sed -i "s/ALLOWED_HOSTS = .*/ALLOWED_HOSTS = ['*']/" trace_service/settings.py || true
     nohup python manage.py migrate >/tmp/ms-trace-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8002 >/tmp/ms-trace.log 2>&1 &
   EOF
@@ -221,6 +239,7 @@ resource "aws_instance" "trace" {
   }
 }
 
+# ================= ms-inventory =================
 resource "aws_instance" "inventory" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -241,6 +260,7 @@ resource "aws_instance" "inventory" {
     source venv/bin/activate
     pip install --upgrade pip
     pip install -r requirements.txt
+    sed -i "s/ALLOWED_HOSTS = .*/ALLOWED_HOSTS = ['*']/" inventory_service/settings.py || true
     nohup python manage.py migrate >/tmp/ms-inventory-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8003 >/tmp/ms-inventory.log 2>&1 &
   EOF
@@ -254,6 +274,7 @@ resource "aws_instance" "inventory" {
   }
 }
 
+# ================= ms-order-detail =================
 resource "aws_instance" "order_detail" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -275,12 +296,13 @@ resource "aws_instance" "order_detail" {
     pip install --upgrade pip
     pip install -r requirements.txt
 
-    # ====== NUEVO: variables para hablarle a los otros servicios por IP privada ======
+    # Variables para hablarle a los otros servicios por IP privada
     export ORDERS_BASE_URL="http://${aws_instance.orders.private_ip}:8001"
     export TRACE_BASE_URL="http://${aws_instance.trace.private_ip}:8002"
     export INVENTORY_BASE_URL="http://${aws_instance.inventory.private_ip}:8003"
     export EXTERNAL_TIMEOUT="1.5"
-    # ===============================================================================
+
+    sed -i "s/ALLOWED_HOSTS = .*/ALLOWED_HOSTS = ['*']/" order_detail_service/settings.py || true
 
     nohup python manage.py migrate >/tmp/ms-order-detail-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8080 >/tmp/ms-order-detail.log 2>&1 &
@@ -295,7 +317,7 @@ resource "aws_instance" "order_detail" {
   }
 }
 
-# ================= Guard (Spring Boot) =================
+# ================= ms-security-guard (Spring Boot) =================
 resource "aws_instance" "guard" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
@@ -312,8 +334,16 @@ resource "aws_instance" "guard" {
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
     cd provesi-sprint4/ms-security-guard
-    mvn -q -DskipTests package
+
+    # Variables de entorno para Auth0 y microservicios
+    export AUTH0_ISSUER="https://dev-yflhyvs1wshg0ugh.us.auth0.com/"
+    export AUTH0_AUDIENCE="https://provesi.orders.api"
+    export ORDERS_BASE_URL="http://${aws_instance.orders.private_ip}:8001"
     export ORDER_DETAIL_BASE_URL="http://${aws_instance.order_detail.private_ip}:8080"
+
+    mvn -q -DskipTests package
+
+    # Usamos spring-boot:run para evitar problemas de manifest en el jar
     nohup mvn spring-boot:run >/tmp/ms-security-guard.log 2>&1 &
   EOF
 
@@ -343,22 +373,17 @@ resource "aws_instance" "kong" {
     systemctl start docker
     usermod -aG docker ubuntu
 
-    AWS_DEFAULT_REGION=$${AWS_DEFAULT_REGION:-us-east-1}
-    GUARD_IP=$(aws ec2 describe-instances \
-      --filters "Name=tag:Name,Values=provesi-ms-guard" "Name=instance-state-name,Values=running" \
-      --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
-
     mkdir -p /home/ubuntu/kong
     cat <<EOK > /home/ubuntu/kong/kong.yml
 _format_version: "3.0"
 services:
 - name: security-guard
-  url: http://$GUARD_IP:8090
+  url: http://${aws_instance.guard.private_ip}:8090
   routes:
   - name: guard-orders-full
     methods: [ "GET" ]
     paths:
-      - "~^/orders/\\d+/full$"
+      - "/orders/"
     strip_path: false
 EOK
 
@@ -366,7 +391,7 @@ EOK
       -e KONG_DATABASE=off \
       -e KONG_DECLARATIVE_CONFIG=/usr/local/kong/declarative/kong.yml \
       -e KONG_PROXY_LISTEN=0.0.0.0:8000 \
-      -e KONG_PROXY_LISTEN_SSL=0.0.0.0:8443 ssl \
+      -e KONG_PROXY_LISTEN_SSL="0.0.0.0:8443 ssl" \
       -e KONG_ADMIN_LISTEN=0.0.0.0:8001 \
       -v /home/ubuntu/kong/kong.yml:/usr/local/kong/declarative/kong.yml:ro \
       -d kong:3.6
@@ -399,8 +424,10 @@ resource "aws_instance" "locust" {
     git clone ${local.repo_url} provesi-sprint4 || true
     cd provesi-sprint4
     pip3 install --upgrade pip
-    pip3 install -r requirements.txt
-    nohup locust -f locustfile.py --host http://${aws_instance.order_detail.private_ip}:8080 >/tmp/locust.log 2>&1 &
+    pip3 install -r requirements.txt || true
+    pip3 install locust
+    # Locust va contra Kong (gateway)
+    nohup locust -f locustfile.py --host http://${aws_instance.kong.private_ip}:8000 >/tmp/locust.log 2>&1 &
   EOF
 
   user_data_replace_on_change = true

@@ -18,5 +18,7 @@ def order_detail(request, order_id: int):
         "total_amount": float(order.total_amount),
         "created_at": order.created_at.isoformat(),
         "updated_at": order.updated_at.isoformat(),
+
+        "ownerVendorId": order.warehouse,
     }
     return JsonResponse(data)
