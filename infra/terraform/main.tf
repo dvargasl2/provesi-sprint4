@@ -15,7 +15,7 @@ provider "aws" {
 locals {
   project       = "provesi-asr"
   instance_type = "t2.micro" # sube a t3.medium si necesitas más RAM
-  repo_url      = "https://github.com/tu-org/provesi-sprint4.git" # ajusta a tu repo real
+  repo_url      = "https://github.com/dvargasl2/provesi-sprint4.git" # ajusta a tu repo real
   branch        = "main"
   zone_name     = "provesi.local"
 }
