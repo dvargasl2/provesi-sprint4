@@ -11,10 +11,6 @@ provider "aws" {
   region = "us-east-1"
 }
 
-variable "key_name" {
-  description = "Nombre del keypair de AWS para SSH"
-  type        = string
-}
 
 locals {
   project       = "provesi-asr"
@@ -204,7 +200,6 @@ EOF
 resource "aws_instance" "shared_db" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -238,7 +233,6 @@ ${local.dns_register}
 resource "aws_instance" "orders" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -275,7 +269,6 @@ ${local.dns_register}
 resource "aws_instance" "trace" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -312,7 +305,6 @@ ${local.dns_register}
 resource "aws_instance" "inventory" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -349,7 +341,6 @@ ${local.dns_register}
 resource "aws_instance" "order_detail" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -387,7 +378,6 @@ ${local.dns_register}
 resource "aws_instance" "guard" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -421,7 +411,6 @@ ${local.dns_register}
 resource "aws_instance" "kong" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
@@ -481,7 +470,6 @@ ${local.dns_register}
 resource "aws_instance" "locust" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
-  key_name                    = var.key_name
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
