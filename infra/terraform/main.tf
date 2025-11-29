@@ -41,55 +41,6 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# Zona privada Route 53 para self-registration
-resource "aws_route53_zone" "private" {
-  name = local.zone_name
-  vpc {
-    vpc_id = data.aws_vpc.default.id
-  }
-}
-
-# IAM role para permitir a las instancias registrar su A record y describir instancias
-data "aws_iam_policy_document" "assume" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "instance_role" {
-  name               = "provesi-ec2-role"
-  assume_role_policy = data.aws_iam_policy_document.assume.json
-}
-
-data "aws_iam_policy_document" "instance_policy" {
-  statement {
-    actions   = ["ec2:DescribeInstances"]
-    resources = ["*"]
-  }
-  statement {
-    actions   = ["route53:ListHostedZones", "route53:ListResourceRecordSets"]
-    resources = ["*"]
-  }
-  statement {
-    actions   = ["route53:ChangeResourceRecordSets"]
-    resources = [aws_route53_zone.private.arn]
-  }
-}
-
-resource "aws_iam_role_policy" "instance_policy" {
-  name   = "provesi-ec2-policy"
-  role   = aws_iam_role.instance_role.id
-  policy = data.aws_iam_policy_document.instance_policy.json
-}
-
-resource "aws_iam_instance_profile" "instance_profile" {
-  name = "provesi-ec2-profile"
-  role = aws_iam_role.instance_role.name
-}
 
 # Security group común
 resource "aws_security_group" "sg" {
@@ -172,29 +123,6 @@ resource "aws_security_group" "sg" {
   }
 }
 
-# Función para registrar DNS (se inyecta en cada user_data)
-locals {
-  dns_register = <<-EOBASH
-    ZONE_ID="${aws_route53_zone.private.zone_id}"
-    DNS_NAME="$${DNS_NAME}"
-    IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
-    cat >/tmp/rr.json <<EOF
-{
-  "Comment": "UPSERT A record",
-  "Changes": [{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "$${DNS_NAME}",
-      "Type": "A",
-      "TTL": 30,
-      "ResourceRecords": [{ "Value": "$${IP}" }]
-    }
-  }]
-}
-EOF
-    aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID" --change-batch file:///tmp/rr.json
-  EOBASH
-}
 
 # ================= DB compartida =================
 resource "aws_instance" "shared_db" {
@@ -203,20 +131,17 @@ resource "aws_instance" "shared_db" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y postgresql postgresql-contrib awscli
+    apt-get install -y postgresql postgresql-contrib
     sudo -u postgres psql -c "CREATE USER shared_user WITH PASSWORD 'sharedPass';"
     sudo -u postgres createdb -O shared_user shared_db
     echo "host all all 0.0.0.0/0 trust" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
     echo "listen_addresses='*'" | sudo tee -a /etc/postgresql/*/main/postgresql.conf
     systemctl restart postgresql
-    DNS_NAME="db.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
@@ -236,13 +161,12 @@ resource "aws_instance" "orders" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y python3 python3-pip python3-venv git awscli
+    apt-get install -y python3 python3-pip python3-venv git
     mkdir -p /labs
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
@@ -253,8 +177,6 @@ resource "aws_instance" "orders" {
     pip install -r requirements.txt
     nohup python manage.py migrate >/tmp/ms-orders-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8001 >/tmp/ms-orders.log 2>&1 &
-    DNS_NAME="orders.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
@@ -272,13 +194,12 @@ resource "aws_instance" "trace" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y python3 python3-pip python3-venv git awscli
+    apt-get install -y python3 python3-pip python3-venv git
     mkdir -p /labs
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
@@ -289,8 +210,6 @@ resource "aws_instance" "trace" {
     pip install -r requirements.txt
     nohup python manage.py migrate >/tmp/ms-trace-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8002 >/tmp/ms-trace.log 2>&1 &
-    DNS_NAME="trace.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
@@ -308,13 +227,12 @@ resource "aws_instance" "inventory" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y python3 python3-pip python3-venv git awscli
+    apt-get install -y python3 python3-pip python3-venv git
     mkdir -p /labs
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
@@ -325,8 +243,6 @@ resource "aws_instance" "inventory" {
     pip install -r requirements.txt
     nohup python manage.py migrate >/tmp/ms-inventory-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8003 >/tmp/ms-inventory.log 2>&1 &
-    DNS_NAME="inventory.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
@@ -344,13 +260,12 @@ resource "aws_instance" "order_detail" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y python3 python3-pip python3-venv git awscli
+    apt-get install -y python3 python3-pip python3-venv git
     mkdir -p /labs
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
@@ -361,8 +276,6 @@ resource "aws_instance" "order_detail" {
     pip install -r requirements.txt
     nohup python manage.py migrate >/tmp/ms-order-detail-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8080 >/tmp/ms-order-detail.log 2>&1 &
-    DNS_NAME="order-detail.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
@@ -381,21 +294,18 @@ resource "aws_instance" "guard" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y git maven openjdk-17-jdk awscli
+    apt-get install -y git maven openjdk-17-jdk
     mkdir -p /labs
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
     cd provesi-sprint4/ms-security-guard
     mvn -q -DskipTests package
     nohup mvn spring-boot:run >/tmp/ms-security-guard.log 2>&1 &
-    DNS_NAME="guard.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
@@ -414,13 +324,12 @@ resource "aws_instance" "kong" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y docker.io awscli
+    apt-get install -y docker.io
     systemctl enable docker
     systemctl start docker
     usermod -aG docker ubuntu
@@ -452,9 +361,6 @@ EOK
       -e KONG_ADMIN_LISTEN=0.0.0.0:8001 \
       -v /home/ubuntu/kong/kong.yml:/usr/local/kong/declarative/kong.yml:ro \
       -d kong:3.6
-
-    DNS_NAME="kong.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
@@ -473,13 +379,12 @@ resource "aws_instance" "locust" {
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
   vpc_security_group_ids      = [aws_security_group.sg.id]
   associate_public_ip_address = true
-  iam_instance_profile        = aws_iam_instance_profile.instance_profile.name
 
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     apt-get update -y
-    apt-get install -y python3 python3-pip git awscli
+    apt-get install -y python3 python3-pip git
     mkdir -p /labs
     cd /labs
     git clone ${local.repo_url} provesi-sprint4 || true
@@ -487,8 +392,6 @@ resource "aws_instance" "locust" {
     pip3 install --upgrade pip
     pip3 install -r requirements.txt
     nohup locust -f locustfile.py --host http://${aws_instance.order_detail.private_ip}:8080 >/tmp/locust.log 2>&1 &
-    DNS_NAME="locust.${local.zone_name}"
-${local.dns_register}
   EOF
 
   user_data_replace_on_change = true
