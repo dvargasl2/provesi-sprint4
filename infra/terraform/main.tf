@@ -120,10 +120,10 @@ resource "aws_security_group" "sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # DBs (solo para lab)
+  # DB compartida (solo para lab)
   ingress {
     from_port   = 5432
-    to_port     = 5436
+    to_port     = 5432
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -142,9 +142,9 @@ resource "aws_security_group" "sg" {
   }
 }
 
-# ================= BASES DE DATOS (Postgres) =================
+# ================= BASE DE DATOS COMPARTIDA (Postgres) =================
 
-resource "aws_instance" "orders_db" {
+resource "aws_instance" "shared_db" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = local.instance_type
   subnet_id                   = element(data.aws_subnets.default.ids, 0)
@@ -156,95 +156,17 @@ resource "aws_instance" "orders_db" {
     set -eux
     apt-get update -y
     apt-get install -y postgresql postgresql-contrib
-    sudo -u postgres psql -c "CREATE USER orders_user WITH PASSWORD 'ordersPass';"
-    sudo -u postgres createdb -O orders_user orders_db
+    sudo -u postgres psql -c "CREATE USER shared_user WITH PASSWORD 'sharedPass';"
+    sudo -u postgres createdb -O shared_user shared_db
     echo "host all all 0.0.0.0/0 trust" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
     echo "listen_addresses='*'" | sudo tee -a /etc/postgresql/*/main/postgresql.conf
     systemctl restart postgresql
   EOF
 
   tags = {
-    Name    = "provesi-db-orders"
+    Name    = "provesi-db-shared"
     Project = local.project
-    Role    = "db-orders"
-  }
-}
-
-resource "aws_instance" "trace_db" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = local.instance_type
-  subnet_id                   = element(data.aws_subnets.default.ids, 0)
-  vpc_security_group_ids      = [aws_security_group.sg.id]
-  associate_public_ip_address = true
-
-  user_data = <<-EOF
-    #!/bin/bash
-    set -eux
-    apt-get update -y
-    apt-get install -y postgresql postgresql-contrib
-    sudo -u postgres psql -c "CREATE USER trace_user WITH PASSWORD 'tracePass';"
-    sudo -u postgres createdb -O trace_user trace_db
-    echo "host all all 0.0.0.0/0 trust" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
-    echo "listen_addresses='*'" | sudo tee -a /etc/postgresql/*/main/postgresql.conf
-    systemctl restart postgresql
-  EOF
-
-  tags = {
-    Name    = "provesi-db-trace"
-    Project = local.project
-    Role    = "db-trace"
-  }
-}
-
-resource "aws_instance" "inventory_db" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = local.instance_type
-  subnet_id                   = element(data.aws_subnets.default.ids, 0)
-  vpc_security_group_ids      = [aws_security_group.sg.id]
-  associate_public_ip_address = true
-
-  user_data = <<-EOF
-    #!/bin/bash
-    set -eux
-    apt-get update -y
-    apt-get install -y postgresql postgresql-contrib
-    sudo -u postgres psql -c "CREATE USER inventory_user WITH PASSWORD 'inventoryPass';"
-    sudo -u postgres createdb -O inventory_user inventory_db
-    echo "host all all 0.0.0.0/0 trust" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
-    echo "listen_addresses='*'" | sudo tee -a /etc/postgresql/*/main/postgresql.conf
-    systemctl restart postgresql
-  EOF
-
-  tags = {
-    Name    = "provesi-db-inventory"
-    Project = local.project
-    Role    = "db-inventory"
-  }
-}
-
-resource "aws_instance" "order_detail_db" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = local.instance_type
-  subnet_id                   = element(data.aws_subnets.default.ids, 0)
-  vpc_security_group_ids      = [aws_security_group.sg.id]
-  associate_public_ip_address = true
-
-  user_data = <<-EOF
-    #!/bin/bash
-    set -eux
-    apt-get update -y
-    apt-get install -y postgresql postgresql-contrib
-    sudo -u postgres psql -c "CREATE USER detail_user WITH PASSWORD 'detailPass';"
-    sudo -u postgres createdb -O detail_user detail_db
-    echo "host all all 0.0.0.0/0 trust" | sudo tee -a /etc/postgresql/*/main/pg_hba.conf
-    echo "listen_addresses='*'" | sudo tee -a /etc/postgresql/*/main/postgresql.conf
-    systemctl restart postgresql
-  EOF
-
-  tags = {
-    Name    = "provesi-db-order-detail"
-    Project = local.project
-    Role    = "db-order-detail"
+    Role    = "db-shared"
   }
 }
 
@@ -479,3 +401,23 @@ resource "aws_instance" "locust" {
     Role    = "locust"
   }
 }
+
+# ================= OUTPUTS =================
+
+output "orders_public_ip"       { value = aws_instance.orders.public_ip }
+output "trace_public_ip"        { value = aws_instance.trace.public_ip }
+output "inventory_public_ip"    { value = aws_instance.inventory.public_ip }
+output "order_detail_public_ip" { value = aws_instance.order_detail.public_ip }
+output "guard_public_ip"        { value = aws_instance.guard.public_ip }
+output "kong_public_ip"         { value = aws_instance.kong.public_ip }
+output "locust_public_ip"       { value = aws_instance.locust.public_ip }
+output "shared_db_public_ip"    { value = aws_instance.shared_db.public_ip }
+
+output "ssh_orders"        { value = "ssh -i <key.pem> ubuntu@${aws_instance.orders.public_dns}" }
+output "ssh_trace"         { value = "ssh -i <key.pem> ubuntu@${aws_instance.trace.public_dns}" }
+output "ssh_inventory"     { value = "ssh -i <key.pem> ubuntu@${aws_instance.inventory.public_dns}" }
+output "ssh_order_detail"  { value = "ssh -i <key.pem> ubuntu@${aws_instance.order_detail.public_dns}" }
+output "ssh_guard"         { value = "ssh -i <key.pem> ubuntu@${aws_instance.guard.public_dns}" }
+output "ssh_kong"          { value = "ssh -i <key.pem> ubuntu@${aws_instance.kong.public_dns}" }
+output "ssh_locust"        { value = "ssh -i <key.pem> ubuntu@${aws_instance.locust.public_dns}" }
+output "ssh_shared_db"     { value = "ssh -i <key.pem> ubuntu@${aws_instance.shared_db.public_dns}" }
