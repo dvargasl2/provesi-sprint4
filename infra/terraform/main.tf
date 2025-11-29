@@ -274,6 +274,14 @@ resource "aws_instance" "order_detail" {
     source venv/bin/activate
     pip install --upgrade pip
     pip install -r requirements.txt
+
+    # ====== NUEVO: variables para hablarle a los otros servicios por IP privada ======
+    export ORDERS_BASE_URL="http://${aws_instance.orders.private_ip}:8001"
+    export TRACE_BASE_URL="http://${aws_instance.trace.private_ip}:8002"
+    export INVENTORY_BASE_URL="http://${aws_instance.inventory.private_ip}:8003"
+    export EXTERNAL_TIMEOUT="1.5"
+    # ===============================================================================
+
     nohup python manage.py migrate >/tmp/ms-order-detail-migrate.log 2>&1 &
     nohup python manage.py runserver 0.0.0.0:8080 >/tmp/ms-order-detail.log 2>&1 &
   EOF
@@ -305,6 +313,7 @@ resource "aws_instance" "guard" {
     git clone ${local.repo_url} provesi-sprint4 || true
     cd provesi-sprint4/ms-security-guard
     mvn -q -DskipTests package
+    export ORDER_DETAIL_BASE_URL="http://${aws_instance.order_detail.private_ip}:8080"
     nohup mvn spring-boot:run >/tmp/ms-security-guard.log 2>&1 &
   EOF
 
