@@ -176,7 +176,7 @@ resource "aws_security_group" "sg" {
 locals {
   dns_register = <<-EOBASH
     ZONE_ID="${aws_route53_zone.private.zone_id}"
-    DNS_NAME="${DNS_NAME}"
+    DNS_NAME="$${DNS_NAME}"
     IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
     cat >/tmp/rr.json <<EOF
 {
@@ -184,10 +184,10 @@ locals {
   "Changes": [{
     "Action": "UPSERT",
     "ResourceRecordSet": {
-      "Name": "${DNS_NAME}",
+      "Name": "$${DNS_NAME}",
       "Type": "A",
       "TTL": 30,
-      "ResourceRecords": [{ "Value": "${IP}" }]
+      "ResourceRecords": [{ "Value": "$${IP}" }]
     }
   }]
 }
